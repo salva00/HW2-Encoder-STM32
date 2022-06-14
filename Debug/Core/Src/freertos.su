@@ -1,0 +1,5 @@
+../Core/Src/freertos.c:113:13:encoderTask	40	static
+../Core/Src/freertos.c:158:13:rt1Task	40	static
+../Core/Src/freertos.c:211:13:rt2Task	48	static
+../Core/Src/freertos.c:267:13:scopeTask	40	static
+../Core/Src/freertos.c:301:13:diagnosticTask	40	static
