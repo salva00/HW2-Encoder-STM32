@@ -1,4 +1,6 @@
-/* USER CODE BEGIN Header */
+/* Scritto da Salvatore Bramante
+ *
+ * USER CODE BEGIN Header */
 /**
   ******************************************************************************
   * @file           : main.c
