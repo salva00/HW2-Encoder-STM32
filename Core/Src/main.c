@@ -1,6 +1,4 @@
-/*
- *
- * USER CODE BEGIN Header */
+/* USER CODE BEGIN Header */
 /**
  *
  * Scritto da Salvatore Bramante
@@ -23,6 +21,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "cmsis_os.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -63,51 +62,69 @@ typedef StaticTask_t osStaticThreadDef_t;
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
- UART_HandleTypeDef huart2;
+ TIM_HandleTypeDef htim3;
+
+UART_HandleTypeDef huart2;
 
 /* Definitions for encoder */
 osThreadId_t encoderHandle;
+uint32_t encoderBuffer[ 128 ];
 osStaticThreadDef_t encoderControlBlock;
 const osThreadAttr_t encoder_attributes = {
   .name = "encoder",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) (osPriorityIdle + 2)
+  .cb_mem = &encoderControlBlock,
+  .cb_size = sizeof(encoderControlBlock),
+  .stack_mem = &encoderBuffer[0],
+  .stack_size = sizeof(encoderBuffer),
+  .priority = (osPriority_t) osPriorityRealtime,
 };
 /* Definitions for rt1 */
 osThreadId_t rt1Handle;
+uint32_t rt1Buffer[ 128 ];
 osStaticThreadDef_t rt1ControlBlock;
 const osThreadAttr_t rt1_attributes = {
   .name = "rt1",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) (osPriorityIdle + 3)
-
+  .cb_mem = &rt1ControlBlock,
+  .cb_size = sizeof(rt1ControlBlock),
+  .stack_mem = &rt1Buffer[0],
+  .stack_size = sizeof(rt1Buffer),
+  .priority = (osPriority_t) osPriorityRealtime,
 };
 /* Definitions for rt2 */
 osThreadId_t rt2Handle;
+uint32_t rt2Buffer[ 128 ];
 osStaticThreadDef_t rt2ControlBlock;
 const osThreadAttr_t rt2_attributes = {
   .name = "rt2",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) (osPriorityIdle + 3)
-
+  .cb_mem = &rt2ControlBlock,
+  .cb_size = sizeof(rt2ControlBlock),
+  .stack_mem = &rt2Buffer[0],
+  .stack_size = sizeof(rt2Buffer),
+  .priority = (osPriority_t) osPriorityLow,
 };
 /* Definitions for scope */
 osThreadId_t scopeHandle;
+uint32_t scopeBuffer[ 128 ];
 osStaticThreadDef_t scopeControlBlock;
 const osThreadAttr_t scope_attributes = {
   .name = "scope",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) (osPriorityIdle + 1)
-
+  .cb_mem = &scopeControlBlock,
+  .cb_size = sizeof(scopeControlBlock),
+  .stack_mem = &scopeBuffer[0],
+  .stack_size = sizeof(scopeBuffer),
+  .priority = (osPriority_t) osPriorityRealtime,
 };
 /* Definitions for diag */
 osThreadId_t diagHandle;
+uint32_t diagBuffer[ 128 ];
 osStaticThreadDef_t diagControlBlock;
 const osThreadAttr_t diag_attributes = {
   .name = "diag",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) (osPriorityIdle + 1)
-
+  .cb_mem = &diagControlBlock,
+  .cb_size = sizeof(diagControlBlock),
+  .stack_mem = &diagBuffer[0],
+  .stack_size = sizeof(diagBuffer),
+  .priority = (osPriority_t) osPriorityLow,
 };
 /* USER CODE BEGIN PV */
 
@@ -117,6 +134,7 @@ const osThreadAttr_t diag_attributes = {
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_TIM3_Init(void);
 void startEncoder(void *argument);
 void StartRt1(void *argument);
 void StartRt2(void *argument);
@@ -158,6 +176,20 @@ struct _slack_rt{
 static struct _slack_rt slack_rt1;
 static struct _slack_rt slack_rt2;
 
+uint32_t counter = 0;
+int16_t position = 0;
+
+void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
+	counter = __HAL_TIM_GET_COUNTER(htim);
+	position = (int16_t)counter/4;	//debug
+
+	  uint8_t MSG[20] = {'\0'};
+
+	  sprintf(MSG,"%d\n",counter);
+	  HAL_UART_Transmit(&huart2, MSG, sizeof(MSG), 100);
+
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -189,7 +221,23 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART2_UART_Init();
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
+
+  HAL_TIM_Encoder_Start_IT(&htim3,TIM_CHANNEL_ALL);
+
+  uint8_t MSG[100] = {'\0'};
+
+  sprintf(MSG,"Select a semiperiod and Click the UserButton (BLUE)\n",counter);
+  HAL_UART_Transmit(&huart2, MSG, sizeof(MSG), 100);
+
+
+  int semiperSelected = 0;
+  while(semiperSelected == 0){
+	  if(HAL_GPIO_ReadPin(GPIOC,GPIO_PIN_13) == GPIO_PIN_RESET){
+		  semiperSelected = 1;
+	  }
+  }
 
   /* USER CODE END 2 */
 
@@ -225,23 +273,20 @@ int main(void)
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
+  /* creation of encoder */
+  encoderHandle = osThreadNew(startEncoder, NULL, &encoder_attributes);
 
+  /* creation of rt1 */
+  rt1Handle = osThreadNew(StartRt1, NULL, &rt1_attributes);
 
-	  /* creation of encoder */
-	  encoderHandle = osThreadNew(startEncoder, NULL, &encoder_attributes);
+  /* creation of rt2 */
+  rt2Handle = osThreadNew(StartRt2, NULL, &rt2_attributes);
 
-	  /* creation of rt1 */
-	  rt1Handle = osThreadNew(StartRt1, NULL, &rt1_attributes);
+  /* creation of scope */
+  scopeHandle = osThreadNew(StartScope, NULL, &scope_attributes);
 
-	  /* creation of rt2 */
-	  rt2Handle = osThreadNew(StartRt2, NULL, &rt2_attributes);
-
-	  /* creation of scope */
-	  scopeHandle = osThreadNew(StartScope, NULL, &scope_attributes);
-
-	  /* creation of diag */
-	  diagHandle = osThreadNew(StartDiag, NULL, &diag_attributes);
-
+  /* creation of diag */
+  diagHandle = osThreadNew(StartDiag, NULL, &diag_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
     }
@@ -277,6 +322,7 @@ void SystemClock_Config(void)
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
   /** Configure the main internal regulator output voltage
+  */
   __HAL_RCC_PWR_CLK_ENABLE();
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE2);
 
@@ -310,6 +356,55 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief TIM3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM3_Init(void)
+{
+
+  /* USER CODE BEGIN TIM3_Init 0 */
+
+  /* USER CODE END TIM3_Init 0 */
+
+  TIM_Encoder_InitTypeDef sConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM3_Init 1 */
+
+  /* USER CODE END TIM3_Init 1 */
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = 0;
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 750;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  sConfig.EncoderMode = TIM_ENCODERMODE_TI12;
+  sConfig.IC1Polarity = TIM_ICPOLARITY_FALLING;
+  sConfig.IC1Selection = TIM_ICSELECTION_DIRECTTI;
+  sConfig.IC1Prescaler = TIM_ICPSC_DIV1;
+  sConfig.IC1Filter = 0;
+  sConfig.IC2Polarity = TIM_ICPOLARITY_FALLING;
+  sConfig.IC2Selection = TIM_ICSELECTION_DIRECTTI;
+  sConfig.IC2Prescaler = TIM_ICPSC_DIV1;
+  sConfig.IC2Filter = 0;
+  if (HAL_TIM_Encoder_Init(&htim3, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM3_Init 2 */
+
+  /* USER CODE END TIM3_Init 2 */
+
 }
 
 /**
@@ -410,11 +505,13 @@ void startEncoder(void *argument)
     /* Randomized period (75-750 RPM) */
 	srand(time(NULL));
 
-	unsigned int semi_per = (rand() % 10) + 1;
+	//unsigned int semi_per = (rand() % 10) + 1;
 
+	unsigned int semi_per = (int unsigned)counter;
   /* Infinite loop */
   for(;;)
   {
+
       vTaskDelayUntil( &xNextWakeTime, xBlockTime );
 
       xSemaphoreTake(enc_data.lock, portMAX_DELAY);
@@ -565,7 +662,7 @@ void StartRt2(void *argument)
 			 xSemaphoreGive(slack_rt2.lock);
 		 }
 		 else{
-			printf("Task rt2: deadline: %lu, finish time: %lu\n",xNextWakeTime + xBlockTime ,xFinishTime);
+			//printf("Task rt2: deadline: %lu, finish time: %lu\n",xNextWakeTime + xBlockTime ,xFinishTime);
 			sprintf(MSG,"Task rt2: deadline: %lu, finish time: %lu\n",xNextWakeTime + xBlockTime ,xFinishTime);
 			HAL_UART_Transmit(&huart2, MSG, sizeof(MSG), 100);
 	     }
