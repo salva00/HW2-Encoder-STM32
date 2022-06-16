@@ -1,7 +1,10 @@
-/* Scritto da Salvatore Bramante
+/*
  *
  * USER CODE BEGIN Header */
 /**
+ *
+ * Scritto da Salvatore Bramante
+ *
   ******************************************************************************
   * @file           : main.c
   * @brief          : Main program body
@@ -20,10 +23,11 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "cmsis_os.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "cmsis_os.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -216,12 +220,13 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
+  if (enc_data.lock != NULL &&  rising_edge.lock != NULL && round_time.lock != NULL &&  slack_rt1.lock != NULL && slack_rt2.lock != NULL)
+    {
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
 
-  if (enc_data.lock != NULL &&  rising_edge.lock != NULL && round_time.lock != NULL &&  slack_rt1.lock != NULL && slack_rt2.lock != NULL)
-  {
+
 	  /* creation of encoder */
 	  encoderHandle = osThreadNew(startEncoder, NULL, &encoder_attributes);
 
@@ -236,9 +241,10 @@ int main(void)
 
 	  /* creation of diag */
 	  diagHandle = osThreadNew(StartDiag, NULL, &diag_attributes);
-  }
+
 
   /* USER CODE BEGIN RTOS_THREADS */
+    }
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
 
