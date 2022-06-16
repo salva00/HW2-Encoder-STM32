@@ -220,7 +220,7 @@ int main(void)
 
   /* Create the thread(s) */
 
-  if (enc_data.lock != NULL &&  rising_edge.lock != NULL && round_time.lock != NULL)
+  if (enc_data.lock != NULL &&  rising_edge.lock != NULL && round_time.lock != NULL &&  slack_rt1.lock != NULL && slack_rt2.lock != NULL)
   {
 	  /* creation of encoder */
 	  encoderHandle = osThreadNew(startEncoder, NULL, &encoder_attributes);
@@ -599,18 +599,13 @@ void StartScope(void *argument)
 		count = rising_edge.count;
 		xSemaphoreGive(rising_edge.lock);
 
-		printf("Rising Edge Counter : %d\t",count);
-
 		xSemaphoreTake(round_time.lock, portMAX_DELAY);
 		diff_us = round_time.time_diff * 1000;        //difference in microseconds
 		xSemaphoreGive(round_time.lock);
 
 		rpm = (unsigned int)((float)60*1000000/diff_us);
 
-		//printf("diff : %f\t",diff_us);				//DEBUG
-
-		printf( "RPM : %u\n",rpm);
-		sprintf(MSG, "RPM : %u\n",rpm);
+		sprintf(MSG, "Rising Edge Counter : %d\t RPM : %u\n",count,rpm);
 		HAL_UART_Transmit(&huart2, MSG, sizeof(MSG), 100);
 		osDelay(1);
 	}
@@ -656,6 +651,7 @@ void StartDiag(void *argument)
     		avg_slack = avg_slack/rounds;
     		sprintf(MSG, "**********SLACK TIME: %ld us**********\n",avg_slack);
     		HAL_UART_Transmit(&huart2, MSG, sizeof(MSG), 100);
+    		HAL_GPIO_TogglePin(GPIOA,GPIO_PIN_5);
     		i = 0;
     	}
     	osDelay(1);
