@@ -25,7 +25,9 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "cmsis_os.h"
+#include "test.h"
+#include "fonts.h"
+#include "ssd1306.h"
 
 /* USER CODE END Includes */
 
@@ -62,7 +64,9 @@ typedef StaticTask_t osStaticThreadDef_t;
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
- TIM_HandleTypeDef htim3;
+ I2C_HandleTypeDef hi2c1;
+
+TIM_HandleTypeDef htim3;
 
 UART_HandleTypeDef huart2;
 
@@ -104,7 +108,7 @@ const osThreadAttr_t rt2_attributes = {
 };
 /* Definitions for scope */
 osThreadId_t scopeHandle;
-uint32_t scopeBuffer[ 128 ];
+uint32_t scopeBuffer[ 1024 ];
 osStaticThreadDef_t scopeControlBlock;
 const osThreadAttr_t scope_attributes = {
   .name = "scope",
@@ -126,6 +130,7 @@ const osThreadAttr_t diag_attributes = {
   .stack_size = sizeof(diagBuffer),
   .priority = (osPriority_t) osPriorityLow,
 };
+
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -135,6 +140,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_TIM3_Init(void);
+static void MX_I2C1_Init(void);
 void startEncoder(void *argument);
 void StartRt1(void *argument);
 void StartRt2(void *argument);
@@ -178,15 +184,22 @@ static struct _slack_rt slack_rt2;
 
 uint32_t counter = 0;
 int16_t position = 0;
+int selected = 0;
 
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
+
+	if(selected == 0){
 	counter = __HAL_TIM_GET_COUNTER(htim);
 	position = (int16_t)counter/4;	//debug
 
-	  uint8_t MSG[20] = {'\0'};
+	  uint8_t MSG[4] = {'\0'};
 
 	  sprintf(MSG,"%d\n",counter);
 	  HAL_UART_Transmit(&huart2, MSG, sizeof(MSG), 100);
+	  SSD1306_GotoXY (10, 30);
+	  SSD1306_Puts ( MSG , &Font_11x18, 1);
+	  SSD1306_UpdateScreen(); // update screen
+	}
 
 }
 
@@ -222,20 +235,29 @@ int main(void)
   MX_GPIO_Init();
   MX_USART2_UART_Init();
   MX_TIM3_Init();
+  MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
+
+  SSD1306_Init();
+  SSD1306_GotoXY(0,0);
+  SSD1306_Puts ("semiperiod:", &Font_11x18, 1);
+
+
+  SSD1306_UpdateScreen(); // update screen
+
 
   HAL_TIM_Encoder_Start_IT(&htim3,TIM_CHANNEL_ALL);
 
   uint8_t MSG[100] = {'\0'};
 
-  sprintf(MSG,"Select a semiperiod and Click the UserButton (BLUE)\n",counter);
+  sprintf(MSG,"Select a semiperiod and Push the encoder\n");
   HAL_UART_Transmit(&huart2, MSG, sizeof(MSG), 100);
 
 
-  int semiperSelected = 0;
-  while(semiperSelected == 0){
+  while(selected == 0){
+	  sprintf(MSG,"%d",counter);
 	  if(HAL_GPIO_ReadPin(GPIOC,GPIO_PIN_13) == GPIO_PIN_RESET){
-		  semiperSelected = 1;
+		  selected = 1;
 	  }
   }
 
@@ -287,6 +309,7 @@ int main(void)
 
   /* creation of diag */
   diagHandle = osThreadNew(StartDiag, NULL, &diag_attributes);
+
 
   /* USER CODE BEGIN RTOS_THREADS */
     }
@@ -359,6 +382,40 @@ void SystemClock_Config(void)
 }
 
 /**
+  * @brief I2C1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C1_Init(void)
+{
+
+  /* USER CODE BEGIN I2C1_Init 0 */
+
+  /* USER CODE END I2C1_Init 0 */
+
+  /* USER CODE BEGIN I2C1_Init 1 */
+
+  /* USER CODE END I2C1_Init 1 */
+  hi2c1.Instance = I2C1;
+  hi2c1.Init.ClockSpeed = 400000;
+  hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
+  hi2c1.Init.OwnAddress1 = 0;
+  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c1.Init.OwnAddress2 = 0;
+  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C1_Init 2 */
+
+  /* USER CODE END I2C1_Init 2 */
+
+}
+
+/**
   * @brief TIM3 Initialization Function
   * @param None
   * @retval None
@@ -379,7 +436,7 @@ static void MX_TIM3_Init(void)
   htim3.Instance = TIM3;
   htim3.Init.Prescaler = 0;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 750;
+  htim3.Init.Period = 10;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   sConfig.EncoderMode = TIM_ENCODERMODE_TI12;
@@ -470,6 +527,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : ENC_SW_Pin */
+  GPIO_InitStruct.Pin = ENC_SW_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(ENC_SW_GPIO_Port, &GPIO_InitStruct);
 
 }
 
@@ -691,7 +754,11 @@ void StartScope(void *argument)
 	unsigned int count=0;
 	float diff_us = 0;
 	unsigned int rpm = 0;
-	uint8_t MSG[100] = {'\0'};
+	uint8_t MSG[60] = {'\0'};
+	uint8_t SMG[30]= {'\0'};
+	uint8_t RPM[30]= {'\0'};
+
+	SSD1306_Clear();
 
   /* Infinite loop */
 	for(;;)
@@ -708,8 +775,20 @@ void StartScope(void *argument)
 
 		rpm = (unsigned int)((float)60*1000000/diff_us);
 
+
 		sprintf(MSG, "Rising Edge Counter : %d\t RPM : %u\n",count,rpm);
 		HAL_UART_Transmit(&huart2, MSG, sizeof(MSG), 100);
+
+		SSD1306_GotoXY(0,0);
+		sprintf(SMG, "RE Counter: %d",count);
+		SSD1306_Puts (SMG, &Font_7x10, 1);
+
+		SSD1306_GotoXY (10, 30);
+		sprintf(RPM, "RPM: %d",rpm);
+		SSD1306_Puts ( RPM , &Font_11x18, 1);
+		SSD1306_UpdateScreen();
+		HAL_Delay(1);
+
 		osDelay(1);
 	}
   /* USER CODE END StartScope */
@@ -754,6 +833,7 @@ void StartDiag(void *argument)
     		avg_slack = avg_slack/rounds;
     		sprintf(MSG, "**********SLACK TIME: %ld us**********\n",avg_slack);
     		HAL_UART_Transmit(&huart2, MSG, sizeof(MSG), 100);
+
     		HAL_GPIO_TogglePin(GPIOA,GPIO_PIN_5);
     		i = 0;
     	}
@@ -761,6 +841,14 @@ void StartDiag(void *argument)
 	}
   /* USER CODE END StartDiag */
 }
+
+/* USER CODE BEGIN Header_StartOledUpdater */
+/**
+* @brief Function implementing the oledUpdater thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartOledUpdater */
 
 /**
   * @brief  Period elapsed callback in non blocking mode
