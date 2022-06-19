@@ -40,15 +40,15 @@ typedef StaticTask_t osStaticThreadDef_t;
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
-#define mainENCODER_PRIORITY     ( tskIDLE_PRIORITY + 2 )
-#define mainTASK1_PRIORITY       ( tskIDLE_PRIORITY + 3 )
-#define mainTASK2_PRIORITY       ( tskIDLE_PRIORITY + 3 )
-#define mainSCOPE_PRIORITY		 ( tskIDLE_PRIORITY + 1 )
-#define mainDIAG_PRIORITY        ( tskIDLE_PRIORITY + 1 )
+#define mainENCODER_PRIORITY     			( osPriorityIdle + 2 )
+#define mainTASK1_PRIORITY       			( osPriorityIdle + 3 )
+#define mainTASK2_PRIORITY       			( osPriorityIdle + 3 )
+#define mainSCOPE_PRIORITY		 			( osPriorityIdle + 1 )
+#define mainDIAG_PRIORITY        			( osPriorityIdle + 1 )
 
 
 
-#define BASE_PERIOD_MS 5
+#define BASE_PERIOD_MS 						5
 #define mainENCODER_TICK_FREQUENCY			pdMS_TO_TICKS( BASE_PERIOD_MS )
 #define mainTASK1_TICK_FREQUENCY			pdMS_TO_TICKS( BASE_PERIOD_MS/2 )
 #define mainTASK2_TICK_FREQUENCY			pdMS_TO_TICKS( BASE_PERIOD_MS/2 )
@@ -80,7 +80,7 @@ const osThreadAttr_t encoder_attributes = {
   .cb_size = sizeof(encoderControlBlock),
   .stack_mem = &encoderBuffer[0],
   .stack_size = sizeof(encoderBuffer),
-  .priority = (osPriority_t) osPriorityRealtime,
+  .priority = (osPriority_t) mainENCODER_PRIORITY,
 };
 /* Definitions for rt1 */
 osThreadId_t rt1Handle;
@@ -92,7 +92,7 @@ const osThreadAttr_t rt1_attributes = {
   .cb_size = sizeof(rt1ControlBlock),
   .stack_mem = &rt1Buffer[0],
   .stack_size = sizeof(rt1Buffer),
-  .priority = (osPriority_t) osPriorityRealtime,
+  .priority = (osPriority_t) mainTASK1_PRIORITY,
 };
 /* Definitions for rt2 */
 osThreadId_t rt2Handle;
@@ -104,7 +104,7 @@ const osThreadAttr_t rt2_attributes = {
   .cb_size = sizeof(rt2ControlBlock),
   .stack_mem = &rt2Buffer[0],
   .stack_size = sizeof(rt2Buffer),
-  .priority = (osPriority_t) osPriorityLow,
+  .priority = (osPriority_t) mainTASK2_PRIORITY,
 };
 /* Definitions for scope */
 osThreadId_t scopeHandle;
@@ -116,7 +116,7 @@ const osThreadAttr_t scope_attributes = {
   .cb_size = sizeof(scopeControlBlock),
   .stack_mem = &scopeBuffer[0],
   .stack_size = sizeof(scopeBuffer),
-  .priority = (osPriority_t) osPriorityRealtime,
+  .priority = (osPriority_t) mainSCOPE_PRIORITY,
 };
 /* Definitions for diag */
 osThreadId_t diagHandle;
@@ -128,7 +128,7 @@ const osThreadAttr_t diag_attributes = {
   .cb_size = sizeof(diagControlBlock),
   .stack_mem = &diagBuffer[0],
   .stack_size = sizeof(diagBuffer),
-  .priority = (osPriority_t) osPriorityLow,
+  .priority = (osPriority_t) mainDIAG_PRIORITY,
 };
 
 /* USER CODE BEGIN PV */
